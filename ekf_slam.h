@@ -23,6 +23,20 @@ public:
 
 	void updateByImageAruco( const cv::Mat &image );
 	
+	void showMarkers() const;
+
+	void showMarkers( cv::Mat &image ) const;
+
+	void showMarkedImg() const;
+	
+	inline const cv::Mat getMarkeredImg() const
+        {
+                return observe->getMarkeredImg();
+        }
+
+private:	
+	bool checkLandmark(int aruco_id, int& landmark_idx);
+
 private:
 	Observation *observe;
 

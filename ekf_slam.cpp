@@ -1,5 +1,6 @@
 #include "ekf_slam.h"
 
+
 namespace slam
 {
 
@@ -56,9 +57,9 @@ void EKFSlam::predictByEncoder( const double &enl, const double &enr )
 
 	// State covariance predict
 	Eigen::Matrix3d G_cauchy;
-	G_cauchy << 1.0, 1.0, -data.delta_s_ * sin_tmp,
+	G_cauchy << 1.0, 0.0, -data.delta_s_ * sin_tmp,
 		    0.0, 1.0, data.delta_s_ * cos_tmp,
-		    0.0, 0.0, 1;
+		    0.0, 0.0, 1.0;
 
 	// --------------------------------------------------//
 	// control covariance predict
@@ -66,24 +67,38 @@ void EKFSlam::predictByEncoder( const double &enl, const double &enr )
 	G_u_p << cos_tmp, -0.5 * data.delta_s_ * sin_tmp,
 		 sin_tmp, 0.5 * data.delta_s_ * cos_tmp,
 		 0      , 1;
+	
+	/*G_u_p << 0.5  * (cos_tmp - data.delta_s_ * sin_tmp / 0.719561485930414), 0.5  * (cos_tmp + data.delta_s_ * sin_tmp / 0.719561485930414),
+   	       0.5  * (sin_tmp + data.delta_s_ * cos_tmp / 0.719561485930414), 0.5  *(sin_tmp - data.delta_s_ * cos_tmp / 0.719561485930414),
+   	       1.0 / 0.719561485930414, -1.0 / 0.719561485930414;
+	*/
 	// -------------------------------------------------//
 	
 	int N = x_.rows();
+	std::cout<<"state vector size = "<<N<<std::endl;
 	Eigen::MatrixXd F( N, 3 );
 	F.setZero();
 	F.block( 0, 0, 3, 3 ) = Eigen::Matrix3d::Identity();
+	//std::cout<<"F matrix = "<<std::endl<<F<<std::endl;
+	
 
 	// consider the landmarkers
-	Eigen::MatrixXd Gt = Eigen::Matrix3d::Identity(N, N);
+	Eigen::MatrixXd Gt = Eigen::MatrixXd::Identity(N, N);
 	Gt.block(0, 0, 3, 3) = G_cauchy;
+	//std::cout<<"Gt matrix = "<<std::endl<<Gt<<std::endl;
 
 	// odometry covarince
 	Eigen::Matrix2d sigma_u;
 	sigma_u << k_ * k_ * data.delta_s_, 0.0,
 		   0.0, k_ * k_ * data.delta_theta_;
-	
+	//std::cout<<"sigma_u = "<<std::endl<<sigma_u<<std::endl;	
+
 	// covariance matrix predict
 	sigma_ = Gt * sigma_ * Gt.transpose() + F * G_u_p * sigma_u * G_u_p.transpose() * F.transpose();
+
+	//std::cout<<"x_ = "<<std::endl<<x_<<std::endl;
+	//std::cout<<"sigma_= "<<std::endl<<sigma_<<std::endl;
+	std::cout<<"------------------------------------"<<std::endl;
 
 	// 
 	last_enl_ = enl;
@@ -104,9 +119,10 @@ void EKFSlam::updateByImageAruco( const cv::Mat &image )
 		Eigen::Matrix2d Q;
 		Q << k_r_ * k_r_ * std::fabs( it.r_ * it.r_ ), 0.0,
 		     0.0, k_phi_ * k_phi_ * std::fabs( it.phi_ * it.phi_ );
-
+		std::cout<<"aruco_id = "<<it.aruco_id_<<std::endl;
 		int i; // the i th landmarker
-		if( Observation::findLandMarker( aruco_ids_, it.aruco_id_, i ) ){
+		//if( Observation::findLandMarker( aruco_ids_, it.aruco_id_, i ) ){
+		if( checkLandmark(it.aruco_id_, i) ) {
 			// if it is a landmarker that already exists
 			int N = x_.rows();
 			Eigen::MatrixXd F( 5, N );
@@ -114,7 +130,7 @@ void EKFSlam::updateByImageAruco( const cv::Mat &image )
 			
 			F.block( 0, 0, 3, 3 ) = Eigen::Matrix3d::Identity();
 			F(3, 3 + 2 * i) = 1;
-			F(4, 3 + 2 * i) = 1;
+			F(4, 4 + 2 * i) = 1;
 			
 			double m_x = x_( 3 + 2 * i, 0 );
 			double m_y = x_( 4 + 2 * i, 0 );	
@@ -151,6 +167,7 @@ void EKFSlam::updateByImageAruco( const cv::Mat &image )
 			sigma_ = ( I - K * H_t ) * sigma_;
 		}	
 		else {
+			std::cout<<"add new landmarkers ..............."<<std::endl;
 			// add new landmarkers
 			double angle = x_(2, 0) + it.phi_;
 			Utils::normalizeAngle( angle );
@@ -205,5 +222,50 @@ void EKFSlam::updateByImageAruco( const cv::Mat &image )
 	}
 }
 
+void EKFSlam::showMarkers() const
+{
+	cv::Mat image = cv::Mat::zeros(600, 600, CV_8UC3);
+	cv::circle( image, cv::Point( 300, 300 ), 3, cv::Scalar(0, 0, 255), -1 );
+	for( int i = 4; i < x_.rows(); i += 2 ){
+		double m_x = x_( i - 1, 0 );
+		double m_y = x_( i, 0 );
+
+		cv::circle( image, cv::Point(300 - m_y * 100, 300 - m_x * 100), 6, cv::Scalar(255, 0, 0), 1 );
+	}	
+
+	cv::imshow("map", image);
+}
+
+void EKFSlam::showMarkers( cv::Mat &image ) const
+{
+        cv::circle( image, cv::Point( 500, 300 ), 3, cv::Scalar(0, 0, 255), -1 );
+        for( int i = 4; i < x_.rows(); i += 2 ){
+                double m_x = x_( i - 1, 0 );
+                double m_y = x_( i, 0 );
+		std::cout<<"marker pose : ( "<<m_x<<", "<<m_y<<" )"<<std::endl;
+		
+                cv::circle( image, cv::Point(500 - m_y * 60, 300 - m_x * 60), 6, cv::Scalar(0, 255, 0), -1 );
+        }
+
+}
+
+// 暴力搜素
+bool EKFSlam::checkLandmark ( int aruco_id, int& landmark_idx )
+{
+    for(size_t i = 0; i < aruco_ids_.size(); i ++){
+        if(aruco_id == aruco_ids_.at(i)){
+            landmark_idx = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+void EKFSlam::showMarkedImg() const
+{
+	cv::Mat markered_img = observe->getMarkeredImg();
+	cv::imshow( "markered image", markered_img );
+	
+}
 
 }

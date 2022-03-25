@@ -1,5 +1,6 @@
 #include "utils.h"
 
+
 namespace slam
 {
 
@@ -24,7 +25,7 @@ void Utils::closeYamlFile()
 
 void Utils::normalizeAngle( double &angle )
 {
-	if( angle > PI ){
+	if( angle >= PI ){
 		angle -= TWO_PI;
 	}
 	

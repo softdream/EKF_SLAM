@@ -1,4 +1,5 @@
 #include "motion.h"
+
 #include <iostream>
 
 namespace slam
@@ -14,7 +15,7 @@ const Motion Motion::getMotionValueFromEncoder( const double enl, const double e
     	/* º∆À„ Delta_l/r */
     	double delta_enl = enl - last_enl;
     	double delta_enr = enr - last_enr;
-	std::cout<<"enl = "<<enl<<", enr = "<<enr<<std::endl;
+	//std::cout<<"enl = "<<enl<<", enr = "<<enr<<std::endl;
 	//std::cout<<"last enl = "<<last_enl<<", last_enr = "<<last_enr<<std::endl;	
 
 	//std::cout<<"delta enl = "<<delta_enl<<", delta enr = "<<delta_enr<<std::endl;

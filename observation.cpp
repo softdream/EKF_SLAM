@@ -1,4 +1,5 @@
 #include "observation.h"
+
 #include <algorithm>
 
 namespace slam
